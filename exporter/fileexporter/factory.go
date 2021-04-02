@@ -16,6 +16,7 @@ package fileexporter
 
 import (
 	"context"
+	"io"
 	"os"
 
 	"go.opentelemetry.io/collector/component"
@@ -78,10 +79,21 @@ func createExporter(config config.Exporter) (*fileExporter, error) {
 	exporter, ok := exporters[cfg]
 
 	if !ok {
-		file, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-		if err != nil {
-			return nil, err
+		var file io.WriteCloser
+
+		switch cfg.Path {
+		case "os.Stdout":
+			file = os.Stdout
+		case "os.Stderr":
+			file = os.Stderr
+		default:
+			f, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+			if err != nil {
+				return nil, err
+			}
+			file = f
 		}
+
 		exporter = &fileExporter{file: file}
 
 		// Remember the receiver in the map

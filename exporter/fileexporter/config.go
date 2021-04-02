@@ -23,5 +23,6 @@ type Config struct {
 	*config.ExporterSettings `mapstructure:"-"`
 
 	// Path of the file to write to. Path is relative to current directory.
+	// Path can also refer to special files such as os.Stdout and os.Stderr.
 	Path string `mapstructure:"path"`
 }
