@@ -90,10 +90,22 @@ func TestFileLogsExporterNoErrors(t *testing.T) {
 							{
 								TimeUnixNano: uint64(now.UnixNano()),
 								Name:         "logA",
+								Body: otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_KvlistValue{KvlistValue: &otlpcommon.KeyValueList{Values: []otlpcommon.KeyValue{
+									{
+										Key:   "request_id",
+										Value: otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "value1"}},
+									},
+								}}}},
 							},
 							{
 								TimeUnixNano: uint64(now.UnixNano()),
 								Name:         "logB",
+								Body: otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_KvlistValue{KvlistValue: &otlpcommon.KeyValueList{Values: []otlpcommon.KeyValue{
+									{
+										Key:   "request_id",
+										Value: otlpcommon.AnyValue{Value: &otlpcommon.AnyValue_StringValue{StringValue: "value2"}},
+									},
+								}}}},
 							},
 						},
 					},

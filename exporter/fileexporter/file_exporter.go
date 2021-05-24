@@ -25,6 +25,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.opentelemetry.io/collector/internal"
+	tracetranslator "go.opentelemetry.io/collector/translator/trace"
 )
 
 // Marshaler configuration used for marhsaling Protobuf to JSON. Use default config.
@@ -37,6 +38,17 @@ type fileExporter struct {
 	mutex sync.Mutex
 }
 
+type LogRecord struct {
+	TimeUnixNano   uint64
+	SeverityNumber int32
+	SeverityText   string
+	Name           string
+	Body           string
+	Attributes     map[string]interface{}
+	TraceId        pdata.TraceID
+	SpanId         pdata.SpanID
+}
+
 func (e *fileExporter) ConsumeTraces(_ context.Context, td pdata.Traces) error {
 	return exportMessageAsLine(e, internal.TracesToOtlp(td.InternalRep()))
 }
@@ -46,8 +58,65 @@ func (e *fileExporter) ConsumeMetrics(_ context.Context, md pdata.Metrics) error
 }
 
 func (e *fileExporter) ConsumeLogs(_ context.Context, ld pdata.Logs) error {
-	request := internal.LogsToOtlp(ld.InternalRep())
-	return exportMessageAsLine(e, request)
+	//request := internal.LogsToOtlp(ld.InternalRep())
+	//x := convert(request)
+	x := convert(ld)
+	for _, y := range x {
+		_ = exportLogAsLine(e, y)
+	}
+	//return exportMessageAsLine(e, request)
+	return nil
+}
+
+func convert(ld pdata.Logs) []string {
+	slsLogs := make([]string, 0)
+	rls := ld.ResourceLogs()
+	for i := 0; i < rls.Len(); i++ {
+		rl := rls.At(i)
+		ills := rl.InstrumentationLibraryLogs()
+		//resource := rl.Resource()
+		//resourceContents := resourceToLogContents(resource)
+		for j := 0; j < ills.Len(); j++ {
+			ils := ills.At(j)
+			//instrumentationLibraryContents := instrumentationLibraryToLogContents(ils.InstrumentationLibrary())
+			logs := ils.Logs()
+			for j := 0; j < logs.Len(); j++ {
+				slsLog := convertLogRecord(logs.At(j))
+				if slsLog != "" {
+					slsLogs = append(slsLogs, slsLog)
+				}
+			}
+		}
+	}
+
+	return slsLogs
+}
+
+func convertLogRecord(lr pdata.LogRecord) string {
+	//return &LogRecord{
+	//	TimeUnixNano:   uint64(lr.Timestamp()),
+	//	SeverityNumber: int32(lr.SeverityNumber()),
+	//	SeverityText:   lr.SeverityText(),
+	//	Name:           lr.Name(),
+	//	Body:           tracetranslator.AttributeValueToString(lr.Body(), false),
+	//	//Attributes:     lr.Attributes(),
+	//	TraceId:        lr.TraceID(),
+	//	SpanId:         lr.SpanID(),
+	//}
+	return tracetranslator.AttributeValueToString(lr.Body(), false)
+}
+
+func exportLogAsLine(e *fileExporter, s string) error {
+	// Ensure only one write operation happens at a time.
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	if _, err := io.WriteString(e.file, s); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(e.file, "\n"); err != nil {
+		return err
+	}
+	return nil
 }
 
 func exportMessageAsLine(e *fileExporter, message proto.Message) error {
